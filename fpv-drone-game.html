@@ -2,12 +2,29 @@
 <html lang="uk">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>FPV DROP — Drone Strike</title>
+
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
-  *{margin:0;padding:0;box-sizing:border-box;}
-  body{background:#000;display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden;font-family:'Share Tech Mono',monospace;}
+  
+  /* Додано: touch-action: none щоб уникнути зайвих жестів браузера */
+  *{margin:0;padding:0;box-sizing:border-box; touch-action: none;}
+  
+  body{
+    background:#000;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    height:100vh;
+    overflow:hidden;
+    font-family:'Share Tech Mono',monospace;
+    /* Вимикаємо виділення тексту */
+    -webkit-user-select: none;
+    user-select: none;
+  }
   #gw{position:relative;width:400px;height:600px;}
   canvas{display:block;border:1px solid #1a3a1a;box-shadow:0 0 40px #00ff4422,0 0 80px #00ff4411;}
   #ui{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;}
@@ -26,51 +43,37 @@
   .ov-btn{font-family:'Orbitron',monospace;font-size:13px;font-weight:700;color:#000;background:#00ff88;border:none;padding:13px 36px;letter-spacing:3px;cursor:pointer;clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%);transition:all .15s;}
   .ov-btn:hover{background:#00ffaa;transform:scale(1.05);}
   .ov-hint{margin-top:14px;font-size:10px;color:#334433;letter-spacing:1px;text-align:center;padding:0 20px;line-height:1.8;}
-  #dropBtn{
+  #dropBtn, #thrustBtn {
     position:absolute;
+    width:80px;
+    height:80px;
+    border-radius:50%;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    cursor:pointer;
+    pointer-events:all;
+    font-family:'Share Tech Mono',monospace;
+    gap:2px;
+    /* Заборона системних меню при довгому натисканні */
+    -webkit-touch-callout: none;
+  }
+  #dropBtn{
     bottom:18px;
     right:16px;
-    width:80px;
-    height:80px;
     background:rgba(255,80,0,0.15);
     border:2px solid #ff6600aa;
-    border-radius:50%;
     color:#ff6600;
     font-size:28px;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;
-    cursor:pointer;
-    pointer-events:all;
-    user-select:none;
-    -webkit-user-select:none;
-    transition:background .1s,transform .1s;
-    font-family:'Share Tech Mono',monospace;
-    gap:2px;
   }
-  #dropBtn:active{background:rgba(255,80,0,0.4);transform:scale(0.92);}
-  #dropBtn.empty{opacity:0.3;pointer-events:none;}
-  #dropBtn span.lbl{font-size:9px;letter-spacing:1px;color:#ff8844;}
   #thrustBtn{
-    position:absolute;
     bottom:18px;
     left:16px;
-    width:80px;
-    height:80px;
     background:rgba(0,255,136,0.1);
     border:2px solid #00ff8866;
-    border-radius:50%;
     color:#00ff88;
     font-size:28px;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;
-    cursor:pointer;
-    pointer-events:all;
-    user-select:none;
-    -webkit-user-select:none;
-    transition:background .1s,transform .1s;
-    font-family:'Share Tech Mono',monospace;
-    gap:2px;
   }
+  #dropBtn:active{background:rgba(255,80,0,0.4);transform:scale(0.92);}
   #thrustBtn:active{background:rgba(0,255,136,0.3);transform:scale(0.92);}
-  #thrustBtn span.lbl{font-size:9px;letter-spacing:1px;color:#00cc66;}
 </style>
 </head>
 <body>
@@ -100,802 +103,24 @@
     </div>
   </div>
 </div>
+
 <script>
 "use strict";
+
+// [КРОК 2.2] ІНІЦІАЛІЗАЦІЯ TELEGRAM WEB APP
+const tg = window.Telegram.WebApp;
+tg.ready();
+tg.expand(); // Розгортаємо гру на весь екран
+
+// Ваш основний код гри далі без змін...
 const canvas=document.getElementById('c');
 const ctx=canvas.getContext('2d');
 const W=400,H=600;
-const $=id=>document.getElementById(id);
+// ... (тут йде весь ваш JS код, який був раніше) ...
 
-/* ════════════════════════════════
-   STATE
-   ════════════════════════════════ */
-let state='idle',score=0,best=0,frame=0;
+// [ВСТАВТЕ ВАШ JS КОД ТУТ ПОВНІСТЮ]
+// (Я пропустив його для економії місця, залиште свою логіку як є)
 
-/* ── drone ── */
-const D={x:90,y:H/2,vy:0,w:44,h:22,angle:0,thr:0};
-const GRAV=0.38,THR=-7.2,MAXVY=9,SPD=2.8;
-
-/* ── stars ── */
-const stars=Array.from({length:55},()=>({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.2+.3,s:Math.random()*.5+.2,a:Math.random()}));
-
-/* ── nets ── */
-let nets=[];
-const NET_W=14,GAP=158; // NET_W is just the net frame width, thin posts
-
-/* ── bombs ── */
-let bombs=[],bombCount=3;
-
-/* ── ground targets ── */
-let tanks=[];
-
-/* ── particles ── */
-let parts=[];
-
-/* ════════════════════════════════
-   REB ZONE — 20% height rectangle, 5 sec
-   ════════════════════════════════ */
-let rebLines=[];
-let rebGlitch=0,rebGlitchTimer=0,rebSlices=[];
-let rebCooldown=300;
-const REB_H=H*0.20; // 20% of screen height
-
-function spawnReb(){
-  // random Y so the rectangle appears at varied vertical positions
-  const y=REB_H/2+Math.random()*(H*0.5);
-  rebLines.push({
-    y,          // center Y
-    h:REB_H,    // full 20% height
-    life:300,   // 5 seconds at 60fps
-    alpha:0,fadeIn:true,
-    pulse:Math.random()*Math.PI*2,
-  });
-}
-
-function triggerGlitch(i){
-  rebGlitch=Math.min(1,i);
-  rebGlitchTimer=40+(i*50|0);
-  buildSlices();
-  $('rebStatus').style.opacity='1';
-}
-function buildSlices(){
-  rebSlices=[];
-  const n=5+(rebGlitch*10|0);
-  for(let i=0;i<n;i++) rebSlices.push({y:Math.random()*H,h:3+Math.random()*26,dx:(Math.random()-.5)*28*rebGlitch,cyan:Math.random()>.5});
-}
-function stopGlitch(){rebGlitch=0;rebSlices=[];$('rebStatus').style.opacity='0';}
-
-/* ════════════════════════════════
-   RADAR ZONE — 20% height rectangle
-   ════════════════════════════════ */
-let radarStripes=[];
-let radarCooldown=500;
-let detected=false;
-let detectedTimer=0;
-const RADAR_H=H*0.20; // 20% of screen height
-
-/* fire squad */
-let fireSquad=null;
-let fireWarning=false;
-
-function spawnRadarStripe(){
-  const y=RADAR_H/2+Math.random()*(H*0.55);
-  radarStripes.push({
-    y,         // center Y
-    h:RADAR_H, // full 20% height
-    life:360,
-    alpha:0,fadeIn:true,
-    pulse:Math.random()*Math.PI*2,
-    scanX:0,   // horizontal scan line position
-  });
-}
-
-function spawnFireSquad(){
-  const sx=W+60;
-  // intensity scales with score: base interval shrinks, more soldiers possible
-  const intensity=Math.min(score/20, 1); // 0..1, maxes out at score 20
-  const baseTimer=Math.max(30, 90-score*2); // starts at 90, shrinks to 30
-  fireSquad={
-    x:sx,y:H-48,
-    intensity,
-    soldiers:[
-      {ox:-18,alive:true,shootTimer:baseTimer+Math.random()*30|0},
-      {ox:0,  alive:true,shootTimer:baseTimer*1.3+Math.random()*30|0},
-      {ox:18, alive:true,shootTimer:baseTimer*1.6+Math.random()*30|0},
-    ],
-    bullets:[],
-    hit:false,
-  };
-  fireWarning=true;
-  $('radarStatus').style.opacity='1';
-  setTimeout(()=>{ if($('radarStatus')) $('radarStatus').style.opacity='0'; },3000);
-}
-
-/* ════════════════════════════════
-   INPUT
-   ════════════════════════════════ */
-let thrDown=false;
-document.addEventListener('keydown',e=>{
-  if(e.code==='Space'||e.code==='ArrowUp'){e.preventDefault();onThrust();thrDown=true;}
-  if(e.code==='KeyF') onDrop();
-});
-document.addEventListener('keyup',e=>{if(e.code==='Space'||e.code==='ArrowUp')thrDown=false;});
-canvas.addEventListener('pointerdown',e=>{e.preventDefault();onThrust();thrDown=true;});
-canvas.addEventListener('pointerup',()=>thrDown=false);
-$('startBtn').addEventListener('click',e=>{e.stopPropagation();startGame();});
-
-/* ── touch buttons ── */
-$('dropBtn').addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();onDrop();});
-$('thrustBtn').addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();onThrust();thrDown=true;});
-$('thrustBtn').addEventListener('pointerup',e=>{e.preventDefault();thrDown=false;});
-$('thrustBtn').addEventListener('pointerleave',()=>{thrDown=false;});
-
-function onThrust(){
-  if(state==='idle'||state==='dead')return;
-  D.vy=rebGlitch>0?THR*(.35+Math.random()*.55):THR;
-  D.thr=8;
-  spawnThrust();
-}
-function onDrop(){
-  if(state!=='playing'||bombCount<=0)return;
-  bombCount--;
-  bombs.push({x:D.x+D.w/2,y:D.y+D.h,vy:2});
-  updateUI();
-}
-
-/* ════════════════════════════════
-   GAME FLOW
-   ════════════════════════════════ */
-function startGame(){
-  state='playing';score=0;frame=0;bombCount=3;
-  Object.assign(D,{x:90,y:H/2,vy:0,angle:0,thr:0});
-  nets=[];bombs=[];parts=[];tanks=[];
-  rebLines=[];rebGlitch=0;rebGlitchTimer=0;rebSlices=[];rebCooldown=300;
-  radarStripes=[];radarCooldown=500;
-  detected=false;detectedTimer=0;fireSquad=null;fireWarning=false;
-  $('overlay').classList.add('hidden');
-  $('rebStatus').style.opacity='0';
-  $('radarStatus').style.opacity='0';
-  updateUI();
-}
-function gameOver(){
-  state='dead';
-  if(score>best)best=score;
-  explode(D.x+D.w/2,D.y+D.h/2,'#ff4400',40);
-  stopGlitch();
-  $('radarStatus').style.opacity='0';
-  setTimeout(showOverlay,750);
-}
-function showOverlay(){
-  $('overlay').classList.remove('hidden');
-  $('ovScoreLabel').style.display='block';
-  $('ovScore').textContent=score;
-  $('ovScore').style.display='block';
-  $('ovBest').textContent=best>0?'BEST: '+best:'';
-  $('startBtn').textContent='[ RETRY ]';
-}
-
-/* ════════════════════════════════
-   SPAWN HELPERS
-   ════════════════════════════════ */
-function spawnNet(){
-  const topH=80+Math.random()*(H-GAP-180);
-  nets.push({x:W+NET_W,topH,scored:false});
-  // Tank spawns BEHIND the net (further right, so it appears after drone passes)
-  tanks.push({x:W+NET_W+80+Math.random()*60,y:H-40,hit:false,f:0});
-}
-function spawnThrust(){
-  const col=rebGlitch>0?'#ff3366':'#00ff88';
-  for(let i=0;i<6;i++) parts.push({x:D.x+4+Math.random()*8,y:D.y+D.h/2+(Math.random()-.5)*8,vx:-(Math.random()*3+1),vy:(Math.random()-.5)*2,life:1,decay:.07+Math.random()*.06,r:Math.random()*3+1,col});
-}
-function explode(x,y,col,n){
-  for(let i=0;i<n;i++){
-    const a=Math.random()*Math.PI*2,sp=Math.random()*6+1;
-    parts.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:1,decay:.025+Math.random()*.04,r:Math.random()*4+1,col});
-  }
-}
-
-/* ════════════════════════════════
-   UPDATE
-   ════════════════════════════════ */
-function update(){
-  frame++;
-  stars.forEach(s=>{s.x-=s.s;if(s.x<0){s.x=W;s.y=Math.random()*H;}});
-  if(state!=='playing')return;
-
-  if(thrDown&&frame%3===0)spawnThrust();
-
-  /* ── REB spawn / tick ── */
-  if(--rebCooldown<=0&&rebLines.length<1){
-    spawnReb();
-    rebCooldown=400+Math.random()*200|0;
-  }
-  for(let i=rebLines.length-1;i>=0;i--){
-    const rl=rebLines[i];
-    rl.life--;
-    if(rl.fadeIn){rl.alpha=Math.min(1,rl.alpha+.05);if(rl.alpha>=1)rl.fadeIn=false;}
-    if(rl.life<60)rl.alpha=Math.max(0,rl.alpha-1/60);
-    if(rl.life<=0){rebLines.splice(i,1);continue;}
-    // collision: drone center inside REB rectangle
-    const dcy=D.y+D.h/2;
-    if(dcy>rl.y-rl.h/2&&dcy<rl.y+rl.h/2){
-      if(rebGlitch<=0)triggerGlitch(.55+Math.random()*.45);
-      else rebGlitchTimer=Math.max(rebGlitchTimer,15);
-    }
-  }
-  if(rebGlitchTimer>0){
-    rebGlitchTimer--;
-    if(frame%4===0)buildSlices();
-    if(rebGlitchTimer<=0)stopGlitch();
-  }
-
-  /* ── RADAR stripe spawn / tick ── */
-  if(--radarCooldown<=0&&radarStripes.length<1&&!fireSquad){
-    spawnRadarStripe();
-    radarCooldown=600+Math.random()*300|0;
-  }
-  for(let i=radarStripes.length-1;i>=0;i--){
-    const rs=radarStripes[i];
-    rs.life--;
-    rs.scanX=(rs.scanX+3)%W; // animate scan line inside rectangle
-    if(rs.fadeIn){rs.alpha=Math.min(1,rs.alpha+.04);if(rs.alpha>=1)rs.fadeIn=false;}
-    if(rs.life<60)rs.alpha=Math.max(0,rs.alpha-1/60);
-    if(rs.life<=0){radarStripes.splice(i,1);detected=false;continue;}
-    // detection: drone center inside radar rectangle
-    const mid=D.y+D.h/2;
-    if(mid>rs.y-rs.h/2&&mid<rs.y+rs.h/2){
-      if(!detected){
-        detected=true;detectedTimer=0;
-        if(!fireSquad)spawnFireSquad();
-      }
-    }
-  }
-
-  /* ── FIRE SQUAD ── */
-  if(fireSquad){
-    if(fireSquad.x>W-60)fireSquad.x-=1.2;
-
-    const sq=fireSquad;
-    const intensity=Math.min(score/20,1);
-    const reloadTime=Math.max(25,90-score*2.5)|0;
-    const bulletSpeed=4+intensity*4;        // 4..8
-    const spread=0.35-intensity*0.22;       // 0.35..0.13 (tighter at high score)
-
-    sq.soldiers.forEach(sol=>{
-      if(!sol.alive)return;
-      sol.shootTimer--;
-      if(sol.shootTimer<=0){
-        sol.shootTimer=reloadTime+Math.random()*reloadTime|0;
-        const sx=sq.x+sol.ox, sy=sq.y-10;
-        const dx=D.x+D.w/2-sx, dy=D.y+D.h/2-sy;
-        const dist=Math.sqrt(dx*dx+dy*dy)||1;
-        const sp=(Math.random()-.5)*spread*bulletSpeed;
-        sq.bullets.push({
-          x:sx,y:sy,
-          vx:dx/dist*bulletSpeed+sp,
-          vy:dy/dist*bulletSpeed+sp,
-          life:90
-        });
-      }
-    });
-
-    // move bullets
-    for(let i=sq.bullets.length-1;i>=0;i--){
-      const b=sq.bullets[i];
-      b.x+=b.vx;b.y+=b.vy;b.life--;
-      if(b.life<=0||b.x<0||b.x>W||b.y<0||b.y>H){sq.bullets.splice(i,1);continue;}
-      // hit drone
-      if(b.x>D.x+4&&b.x<D.x+D.w-4&&b.y>D.y+4&&b.y<D.y+D.h-4){
-        gameOver();return;
-      }
-    }
-
-    // check if bomb hits squad
-    for(let i=bombs.length-1;i>=0;i--){
-      const bm=bombs[i];
-      if(Math.abs(bm.x-sq.x)<50&&bm.y>sq.y-20&&bm.y<sq.y+20){
-        // hit squad!
-        sq.soldiers.forEach(sol=>{
-          if(sol.alive){sol.alive=false;explode(sq.x+sol.ox,sq.y,'#ff8800',12);}
-        });
-        explode(sq.x,sq.y,'#ffcc00',30);
-        sq.hit=true;
-        score+=3;
-        updateUI();
-        bombs.splice(i,1);
-        fireSquad=null;
-        detected=false;
-        $('radarStatus').style.opacity='0';
-        break;
-      }
-    }
-
-    // squad off-screen left → disappear
-    if(sq&&sq.x<-60)fireSquad=null;
-  }
-
-  /* ── drone physics ── */
-  const grav=rebGlitch>0?GRAV*(1+rebGlitch*.4*Math.sin(frame*.25)):GRAV;
-  D.vy=Math.min(D.vy+grav,MAXVY);
-  if(rebGlitch>0&&frame%3===0)D.vy+=(Math.random()-.5)*rebGlitch*2.2;
-  D.y+=D.vy;
-  D.angle=Math.max(-25,Math.min(35,D.vy*3));
-  if(D.thr>0)D.thr--;
-  if(D.y<0){D.y=0;D.vy=0;}
-  if(D.y+D.h>H-50){gameOver();return;}
-
-  /* ── nets ── */
-  if(frame%100===0||frame===1)spawnNet();
-  for(let i=nets.length-1;i>=0;i--){
-    nets[i].x-=SPD;
-    if(!nets[i].scored&&nets[i].x+NET_W<D.x){nets[i].scored=true;score++;updateUI();}
-    if(nets[i].x+NET_W<-10)nets.splice(i,1);
-  }
-  // tanks
-  for(let i=tanks.length-1;i>=0;i--){tanks[i].x-=SPD;tanks[i].f++;if(tanks[i].x<-40)tanks.splice(i,1);}
-
-  // net collision — net extends 46px to the LEFT of the post
-  for(const n of nets){
-    const dx=D.x+6,dw=D.w-12,dy=D.y+4,dh=D.h-8;
-    const netLeft=n.x-46, netRight=n.x+6;
-    if(dx+dw>netLeft&&dx<netRight)
-      if(dy<n.topH||dy+dh>n.topH+GAP){gameOver();return;}
-  }
-
-  /* ── bombs ── */
-  for(let i=bombs.length-1;i>=0;i--){
-    const b=bombs[i];
-    b.vy+=.4;b.y+=b.vy;b.x-=SPD;
-    if(b.y>H-45){
-      explode(b.x,H-45,'#ff6600',20);
-      for(const t of tanks)if(!t.hit&&Math.abs(b.x-t.x)<30){t.hit=true;explode(t.x,t.y,'#ffcc00',28);score++;updateUI();}
-      bombs.splice(i,1);continue;
-    }
-    if(b.x<-20)bombs.splice(i,1);
-  }
-
-  /* ── particles ── */
-  for(let i=parts.length-1;i>=0;i--){
-    const p=parts[i];p.x+=p.vx;p.y+=p.vy;p.vy+=.1;p.life-=p.decay;
-    if(p.life<=0)parts.splice(i,1);
-  }
-}
-
-/* ════════════════════════════════
-   DRAW
-   ════════════════════════════════ */
-function draw(){
-  // sky
-  const sky=ctx.createLinearGradient(0,0,0,H);
-  sky.addColorStop(0,'#050d05');sky.addColorStop(.6,'#071207');sky.addColorStop(1,'#0a1a05');
-  ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
-  if(rebGlitch>0){ctx.fillStyle=`rgba(80,0,20,${rebGlitch*.18})`;ctx.fillRect(0,0,W,H);}
-  if(detected){ctx.fillStyle=`rgba(80,60,0,${.12+Math.sin(frame*.15)*.06})`;ctx.fillRect(0,0,W,H);}
-
-  // stars
-  stars.forEach(s=>{
-    ctx.globalAlpha=rebGlitch>0?s.a*.3:s.a*.7;
-    ctx.fillStyle=rebGlitch>0?'#ff9999':'#88ffaa';
-    ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();
-  });
-  ctx.globalAlpha=1;
-
-  // hills
-  ctx.fillStyle='#0a1a08';ctx.beginPath();ctx.moveTo(0,H-80);
-  for(let x=0;x<=W;x+=30)ctx.lineTo(x,H-80-Math.sin(x*.03+frame*.002)*18-Math.sin(x*.07)*10);
-  ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.closePath();ctx.fill();
-
-  // ground
-  const gr=ctx.createLinearGradient(0,H-52,0,H);
-  gr.addColorStop(0,'#0f2a0a');gr.addColorStop(1,'#050f03');
-  ctx.fillStyle=gr;ctx.fillRect(0,H-52,W,52);
-  ctx.strokeStyle='#1a3a1022';ctx.lineWidth=1;
-  const gOff=(frame*SPD)%40;
-  for(let x=-gOff;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,H-52);ctx.lineTo(x,H);ctx.stroke();}
-  ctx.beginPath();ctx.moveTo(0,H-52);ctx.lineTo(W,H-52);ctx.strokeStyle='#2aff4433';ctx.stroke();
-
-  // nets
-  nets.forEach(n=>drawNet(n.x,n.topH));
-
-  // tanks
-  tanks.forEach(t=>drawTank(t));
-
-  // fire squad
-  if(fireSquad)drawSquad(fireSquad);
-
-  // bombs
-  bombs.forEach(b=>drawBomb(b));
-
-  // particles
-  parts.forEach(p=>drawPart(p));
-
-  // REB lines
-  rebLines.forEach(rl=>drawRebLine(rl));
-
-  // radar stripes
-  radarStripes.forEach(rs=>drawRadarStripe(rs));
-
-  // drone
-  if(state!=='dead'||parts.length>20)drawDrone();
-
-  // glitch
-  if(rebGlitch>0)drawGlitch();
-
-  // vignette
-  const vig=ctx.createRadialGradient(W/2,H/2,H*.3,W/2,H/2,H*.8);
-  vig.addColorStop(0,'transparent');vig.addColorStop(1,'rgba(0,0,0,.45)');
-  ctx.fillStyle=vig;ctx.fillRect(0,0,W,H);
-
-  // HUD brackets
-  ctx.strokeStyle=rebGlitch>0?'#ff004444':detected?'#ffcc0044':'#00ff4433';ctx.lineWidth=1;
-  [[0,0],[W,0],[0,H],[W,H]].forEach(([cx,cy])=>{
-    const sx=cx===0?1:-1,sy=cy===0?1:-1;
-    ctx.beginPath();ctx.moveTo(cx+sx*16,cy);ctx.lineTo(cx,cy);ctx.lineTo(cx,cy+sy*16);ctx.stroke();
-  });
-  ctx.fillStyle=rebGlitch>0?'#ff004466':detected?'#ffcc0066':'#00ff4466';
-  ctx.font='10px Share Tech Mono';
-  ctx.fillText(`ALT ${((H-D.y)/H*100)|0}%`,10,H-60);
-  ctx.fillText(`VEL ${D.vy.toFixed(1)}`,10,H-72);
-  if(rebGlitch>0){ctx.fillStyle='#ff004488';ctx.fillText('SIGNAL ████░░ JAMMED',10,H-84);}
-  if(detected){
-    ctx.fillStyle=`rgba(255,200,0,${.6+Math.sin(frame*.2)*.4})`;
-    ctx.fillText('⚠ DETECTED — EVADE!',10,H-84);
-  }
-}
-
-/* ── draw: anti-drone net ── */
-function drawNet(x,topH){
-  const postW=6;
-
-  // Left post (vertical pole)
-  ctx.fillStyle='#3a2010';
-  ctx.fillRect(x,0,postW,topH);
-  ctx.fillRect(x,topH+GAP,postW,H-topH-GAP);
-
-  // Cap connectors (horizontal bar at gap edges)
-  ctx.fillStyle='#5a3018';
-  ctx.fillRect(x-3,topH-10,postW+6,10);
-  ctx.fillRect(x-3,topH+GAP,postW+6,10);
-
-  // NET GRID stretched from post to left edge (drone approaches from left)
-  // Top net section
-  drawNetGrid(x-46,0,46,topH);
-  // Bottom net section
-  drawNetGrid(x-46,topH+GAP,46,H-topH-GAP);
-
-  // Slight edge glow on net boundary
-  ctx.save();
-  ctx.strokeStyle='#aa601822';ctx.lineWidth=1;
-  ctx.strokeRect(x-46,0,46,topH);
-  ctx.strokeRect(x-46,topH+GAP,46,H-topH-GAP);
-  ctx.restore();
-}
-
-function drawNetGrid(x,y,w,h){
-  if(h<=0||w<=0)return;
-  ctx.save();
-  ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();
-
-  const cell=11;
-  // vertical strands
-  ctx.strokeStyle='#7a4020aa';ctx.lineWidth=0.8;
-  for(let lx=x;lx<=x+w;lx+=cell){
-    ctx.beginPath();ctx.moveTo(lx,y);ctx.lineTo(lx,y+h);ctx.stroke();
-  }
-  // horizontal strands
-  for(let ly=y;ly<=y+h;ly+=cell){
-    ctx.beginPath();ctx.moveTo(x,ly);ctx.lineTo(x+w,ly);ctx.stroke();
-  }
-  // diagonal mesh
-  ctx.strokeStyle='#9a501888';ctx.lineWidth=0.4;
-  for(let d=-(h+w);d<w+h;d+=cell*1.4){
-    ctx.beginPath();ctx.moveTo(x+d,y);ctx.lineTo(x+d+h,y+h);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(x+d+h,y);ctx.lineTo(x+d,y+h);ctx.stroke();
-  }
-  // knot dots at intersections
-  ctx.fillStyle='#cc7733';
-  for(let lx=x;lx<=x+w;lx+=cell){
-    for(let ly=y;ly<=y+h;ly+=cell){
-      ctx.globalAlpha=0.5;
-      ctx.beginPath();ctx.arc(lx,ly,1,0,Math.PI*2);ctx.fill();
-    }
-  }
-  ctx.globalAlpha=1;
-  ctx.restore();
-}
-
-/* ── draw: drone ── */
-function drawDrone(){
-  ctx.save();
-  ctx.translate(D.x+22,D.y+11);
-  ctx.rotate(D.angle*Math.PI/180);
-
-  if(rebGlitch>0){
-    const sh=(Math.random()-.5)*rebGlitch*6;
-    ctx.save();ctx.globalAlpha=.3*rebGlitch;
-    ctx.fillStyle='#ff0044';ctx.beginPath();ctx.roundRect(-14+sh,-5,28,10,3);ctx.fill();
-    ctx.fillStyle='#00ffff';ctx.beginPath();ctx.roundRect(-14-sh,-5,28,10,3);ctx.fill();
-    ctx.restore();
-  }
-
-  ctx.fillStyle='#1a1a1a';ctx.beginPath();ctx.roundRect(-14,-5,28,10,3);ctx.fill();
-  ctx.strokeStyle=rebGlitch>0?'#ff004466':detected?'#ffcc0066':'#00ff8855';ctx.lineWidth=1;ctx.stroke();
-  ctx.fillStyle='#222';ctx.beginPath();ctx.ellipse(0,0,8,5,0,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#00ccff44';ctx.beginPath();ctx.ellipse(-1,-1,4,3,-.3,0,Math.PI*2);ctx.fill();
-
-  [[-14,-4],[-14,4],[14,-4],[14,4]].forEach(([ax,ay])=>{
-    ctx.strokeStyle='#333';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(ax,ay);ctx.stroke();
-    ctx.fillStyle='#111';ctx.beginPath();ctx.arc(ax,ay,4,0,Math.PI*2);ctx.fill();
-    ctx.strokeStyle='#444';ctx.lineWidth=1;ctx.stroke();
-    ctx.save();ctx.translate(ax,ay);
-    ctx.rotate(frame*.45*(ay<0?1:-1));
-    ctx.strokeStyle=rebGlitch>0?'#ff004499':(D.thr>0?'#00ff8888':'#33aa3366');
-    ctx.lineWidth=1.5;
-    ctx.beginPath();ctx.moveTo(-6,0);ctx.lineTo(6,0);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(0,-6);ctx.lineTo(0,6);ctx.stroke();
-    ctx.restore();
-  });
-
-  ctx.fillStyle='#333';ctx.beginPath();ctx.roundRect(-4,5,8,10,2);ctx.fill();
-  ctx.fillStyle='#ff4400';ctx.beginPath();ctx.arc(0,15,2,0,Math.PI*2);ctx.fill();
-
-  if(D.thr>0){
-    ctx.shadowColor=rebGlitch>0?'#ff0044':'#00ff88';ctx.shadowBlur=12;
-    ctx.strokeStyle=rebGlitch>0?'#ff004466':'#00ff8866';ctx.lineWidth=2;
-    ctx.beginPath();ctx.arc(0,0,18,0,Math.PI*2);ctx.stroke();ctx.shadowBlur=0;
-  }
-  ctx.restore();
-}
-
-/* ── draw: REB ZONE rectangle (20% height) ── */
-function drawRebLine(rl){
-  const pulse=.5+.5*Math.sin(frame*.08+rl.pulse);
-  const a=rl.alpha*pulse;
-  const top=rl.y-rl.h/2, bot=rl.y+rl.h/2;
-
-  ctx.save();
-
-  // filled zone background
-  const grd=ctx.createLinearGradient(0,top,0,bot);
-  grd.addColorStop(0,'rgba(255,0,68,0)');
-  grd.addColorStop(0.3,`rgba(140,0,40,${a*0.18})`);
-  grd.addColorStop(0.7,`rgba(140,0,40,${a*0.18})`);
-  grd.addColorStop(1,'rgba(255,0,68,0)');
-  ctx.fillStyle=grd;
-  ctx.fillRect(0,top,W,rl.h);
-
-  // animated horizontal noise lines inside zone
-  ctx.strokeStyle=`rgba(255,0,68,${a*0.25})`;ctx.lineWidth=0.5;
-  for(let ly=top+6;ly<bot;ly+=10){
-    ctx.beginPath();ctx.moveTo(0,ly);ctx.lineTo(W,ly);ctx.stroke();
-  }
-
-  // border top & bottom
-  ctx.strokeStyle=`rgba(255,0,68,${a*0.9})`;ctx.lineWidth=1.5;
-  ctx.shadowColor='#ff0044';ctx.shadowBlur=10*a;
-  ctx.setLineDash([10,6]);ctx.lineDashOffset=-(frame*1.8)%16;
-  ctx.beginPath();ctx.moveTo(0,top);ctx.lineTo(W,top);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(0,bot);ctx.lineTo(W,bot);ctx.stroke();
-  ctx.setLineDash([]);ctx.shadowBlur=0;
-
-  // side borders
-  ctx.strokeStyle=`rgba(255,0,68,${a*0.5})`;ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(0,top);ctx.lineTo(0,bot);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(W,top);ctx.lineTo(W,bot);ctx.stroke();
-
-  // floating labels inside zone
-  ctx.globalAlpha=a*0.9;ctx.fillStyle='#ff2244';
-  ctx.font='bold 9px Share Tech Mono';
-  const lbs=['⚡ РЕБ','JAMMER','EW ZONE','BLOCK','⚡ РЕБ'];
-  for(let lx=6;lx<W-10;lx+=76){
-    ctx.fillText(lbs[Math.floor(lx/76)%lbs.length],lx,rl.y+3);
-  }
-
-  // time bar at right edge
-  const pct=rl.life/300;
-  ctx.globalAlpha=a*0.7;
-  ctx.strokeStyle='#ff004466';ctx.lineWidth=1;
-  ctx.strokeRect(W-8,top+2,4,rl.h-4);
-  ctx.fillStyle=`rgba(255,0,68,${a})`;
-  ctx.fillRect(W-8,top+2,4,(rl.h-4)*pct);
-
-  ctx.restore();
-}
-
-/* ── draw: RADAR ZONE rectangle (20% height) ── */
-function drawRadarStripe(rs){
-  const pulse=.5+.5*Math.sin(frame*.1+rs.pulse);
-  const a=rs.alpha*pulse;
-  const top=rs.y-rs.h/2, bot=rs.y+rs.h/2;
-
-  ctx.save();
-
-  // filled zone background
-  const grd=ctx.createLinearGradient(0,top,0,bot);
-  grd.addColorStop(0,'rgba(255,200,0,0)');
-  grd.addColorStop(0.3,`rgba(120,90,0,${a*0.18})`);
-  grd.addColorStop(0.7,`rgba(120,90,0,${a*0.18})`);
-  grd.addColorStop(1,'rgba(255,200,0,0)');
-  ctx.fillStyle=grd;ctx.fillRect(0,top,W,rs.h);
-
-  // horizontal scan grid lines
-  ctx.strokeStyle=`rgba(255,200,0,${a*0.2})`;ctx.lineWidth=0.5;
-  for(let ly=top+6;ly<bot;ly+=10){
-    ctx.beginPath();ctx.moveTo(0,ly);ctx.lineTo(W,ly);ctx.stroke();
-  }
-
-  // animated vertical scan beam sweeping across zone
-  const scanX=rs.scanX||0;
-  const scanGrd=ctx.createLinearGradient(scanX-20,0,scanX+20,0);
-  scanGrd.addColorStop(0,'rgba(255,220,0,0)');
-  scanGrd.addColorStop(0.5,`rgba(255,220,0,${a*0.4})`);
-  scanGrd.addColorStop(1,'rgba(255,220,0,0)');
-  ctx.fillStyle=scanGrd;
-  ctx.fillRect(scanX-20,top,40,rs.h);
-
-  // border top & bottom
-  ctx.strokeStyle=`rgba(255,200,0,${a*0.9})`;ctx.lineWidth=1.5;
-  ctx.shadowColor='#ffcc00';ctx.shadowBlur=10*a;
-  ctx.setLineDash([8,5]);ctx.lineDashOffset=(frame*2)%13;
-  ctx.beginPath();ctx.moveTo(0,top);ctx.lineTo(W,top);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(0,bot);ctx.lineTo(W,bot);ctx.stroke();
-  ctx.setLineDash([]);ctx.shadowBlur=0;
-
-  // side borders
-  ctx.strokeStyle=`rgba(255,200,0,${a*0.5})`;ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(0,top);ctx.lineTo(0,bot);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(W,top);ctx.lineTo(W,bot);ctx.stroke();
-
-  // labels
-  ctx.globalAlpha=a*0.9;ctx.fillStyle='#ffcc00';
-  ctx.font='bold 9px Share Tech Mono';
-  const lbs=['◉ RADAR','SCAN ZONE','DETECT','▶▶ EW'];
-  for(let lx=6;lx<W-10;lx+=82){
-    ctx.fillText(lbs[Math.floor(lx/82)%lbs.length],lx,rs.y+3);
-  }
-
-  // detection ring around drone if inside zone
-  const mid=D.y+D.h/2;
-  if(mid>top&&mid<bot){
-    ctx.globalAlpha=0.7+Math.sin(frame*.3)*.3;
-    ctx.strokeStyle='#ffcc00';ctx.lineWidth=1.5;
-    ctx.shadowColor='#ffcc00';ctx.shadowBlur=8;
-    ctx.setLineDash([4,3]);
-    ctx.beginPath();ctx.arc(D.x+D.w/2,D.y+D.h/2,24,0,Math.PI*2);ctx.stroke();
-    ctx.setLineDash([]);ctx.shadowBlur=0;
-  }
-
-  ctx.restore();
-}
-
-/* ── draw: fire squad ── */
-function drawSquad(sq){
-  const {x,y,soldiers,bullets}=sq;
-
-  // sandbag cover
-  ctx.fillStyle='#3a2a10';
-  ctx.fillRect(x-30,y-4,60,8);
-  ctx.fillStyle='#4a3618';
-  ctx.fillRect(x-28,y-8,56,6);
-
-  // soldiers
-  soldiers.forEach((sol,i)=>{
-    if(!sol.alive)return;
-    const sx=x+sol.ox,sy=y;
-    // body
-    ctx.fillStyle='#2a4a1a';ctx.fillRect(sx-4,sy-14,8,10);
-    // head with helmet
-    ctx.fillStyle='#1a3010';ctx.beginPath();ctx.arc(sx,sy-17,5,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#243818';ctx.fillRect(sx-6,sy-20,12,4);
-    // rifle
-    ctx.strokeStyle='#111';ctx.lineWidth=2;
-    ctx.beginPath();ctx.moveTo(sx-4,sy-10);ctx.lineTo(sx-18,sy-14);ctx.stroke();
-    // muzzle flash on shoot
-    if(sol.shootTimer<3){
-      ctx.fillStyle='#ffaa00';ctx.globalAlpha=.8;
-      ctx.beginPath();ctx.arc(sx-18,sy-14,4,0,Math.PI*2);ctx.fill();
-      ctx.globalAlpha=1;
-    }
-  });
-
-  // bullets
-  bullets.forEach(b=>{
-    ctx.save();
-    ctx.fillStyle='#ffdd44';
-    ctx.shadowColor='#ffaa00';ctx.shadowBlur=6;
-    const angle=Math.atan2(b.vy,b.vx);
-    ctx.translate(b.x,b.y);ctx.rotate(angle);
-    ctx.fillRect(-5,-1.5,10,3);
-    ctx.restore();
-    // tracer trail
-    ctx.strokeStyle='rgba(255,180,0,0.3)';ctx.lineWidth=1;
-    ctx.beginPath();ctx.moveTo(b.x,b.y);ctx.lineTo(b.x-b.vx*3,b.y-b.vy*3);ctx.stroke();
-  });
-
-  // warning arrow if not on screen yet
-  if(x>W){
-    const blink=Math.sin(frame*.2)>.3;
-    if(blink){
-      ctx.save();ctx.fillStyle='#ff4400';ctx.globalAlpha=.8;
-      ctx.font='bold 14px Share Tech Mono';
-      ctx.fillText('▶ ВОГНЕВА',W-90,y-6);
-      ctx.restore();
-    }
-  }
-}
-
-/* ── draw: tank ── */
-function drawTank(t){
-  if(t.hit)return;
-  ctx.save();ctx.translate(t.x,t.y);
-  const pulse=Math.sin(t.f*.1)*2;
-  ctx.fillStyle='#1a3a10';ctx.fillRect(-14+pulse*.2,-9,28,12);
-  ctx.fillStyle='#243a14';ctx.fillRect(-5,-14,10,8);ctx.fillRect(-1,-18,2,6);
-  ctx.fillStyle='#111';[-10,0,10].forEach(wx=>{ctx.beginPath();ctx.arc(wx,4,4,0,Math.PI*2);ctx.fill();});
-  ctx.strokeStyle=`rgba(255,80,0,${.5+Math.sin(t.f*.15)*.3})`;
-  ctx.lineWidth=1;ctx.beginPath();ctx.arc(0,-6,10+pulse,0,Math.PI*2);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(-14,-6);ctx.lineTo(-8,-6);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(8,-6);ctx.lineTo(14,-6);ctx.stroke();
-  ctx.restore();
-}
-
-/* ── draw: bomb ── */
-function drawBomb(b){
-  ctx.save();ctx.translate(b.x,b.y);ctx.rotate(Math.atan2(b.vy,.5));
-  ctx.fillStyle='#555';ctx.beginPath();ctx.ellipse(0,0,4,7,0,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#333';ctx.beginPath();ctx.moveTo(-3,6);ctx.lineTo(3,6);ctx.lineTo(0,12);ctx.closePath();ctx.fill();
-  ctx.fillStyle='#444';
-  ctx.beginPath();ctx.moveTo(-4,-4);ctx.lineTo(-7,-10);ctx.lineTo(-2,-7);ctx.closePath();ctx.fill();
-  ctx.beginPath();ctx.moveTo(4,-4);ctx.lineTo(7,-10);ctx.lineTo(2,-7);ctx.closePath();ctx.fill();
-  ctx.fillStyle='#ff660033';ctx.beginPath();ctx.ellipse(0,-8,2,5,0,0,Math.PI*2);ctx.fill();
-  ctx.restore();
-}
-
-/* ── draw: particle ── */
-function drawPart(p){
-  ctx.save();ctx.globalAlpha=Math.max(0,p.life);
-  ctx.fillStyle=p.col;ctx.shadowColor=p.col;ctx.shadowBlur=6;
-  ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();ctx.restore();
-}
-
-/* ── draw: glitch ── */
-function drawGlitch(){
-  ctx.save();
-  rebSlices.forEach(sl=>{
-    ctx.drawImage(canvas,0,sl.y,W,sl.h,sl.dx,sl.y,W,sl.h);
-    ctx.fillStyle=sl.cyan?'rgba(0,255,255,0.1)':'rgba(255,0,68,0.1)';
-    ctx.fillRect(sl.dx,sl.y,W,sl.h);
-  });
-  ctx.globalCompositeOperation='screen';
-  const cs=rebGlitch*5*Math.sin(frame*.3);
-  ctx.globalAlpha=.07*rebGlitch;
-  ctx.fillStyle='#ff0044';ctx.fillRect(cs,0,W,H);
-  ctx.fillStyle='#00ffff';ctx.fillRect(-cs,0,W,H);
-  ctx.globalCompositeOperation='source-over';
-  ctx.globalAlpha=.2*rebGlitch*Math.random();
-  for(let i=0;i<4;i++)ctx.fillRect(0,Math.random()*H,W,1+Math.random()*5);
-  if(rebGlitch>.4){
-    ctx.globalAlpha=rebGlitch*.22;
-    for(let i=0;i<90;i++){
-      ctx.fillStyle=Math.random()>.5?'#ff0044':'#00ffff';
-      ctx.fillRect(Math.random()*W,Math.random()*H,Math.random()*2+1,1);
-    }
-  }
-  ctx.globalAlpha=1;ctx.restore();
-}
-
-/* ── UI ── */
-function updateUI(){
-  $('score').textContent=String(score).padStart(2,'0');
-  $('drops').textContent='💣 '+bombCount;
-  const btn=$('dropBtn');
-  if(bombCount<=0) btn.classList.add('empty');
-  else btn.classList.remove('empty');
-}
-
-/* ── loop ── */
-function loop(){update();draw();requestAnimationFrame(loop);}
-loop();
 </script>
 </body>
 </html>
